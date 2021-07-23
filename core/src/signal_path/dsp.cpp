@@ -4,17 +4,19 @@ SignalPath::SignalPath() {
     
 }
 
-void SignalPath::init(uint64_t sampleRate, int fftRate, int fftSize, dsp::stream<dsp::complex_t>* input, dsp::complex_t* fftBuffer, void fftHandler(dsp::complex_t*,int,void*)) {
+void SignalPath::init(uint64_t sampleRate, int fftRate, int fftSize, dsp::stream<dsp::complex_t>* input, dsp::complex_t* fftBuffer, void fftHandler(dsp::complex_t*,int,void*), void* fftHandlerCtx) {
     this->sampleRate = sampleRate;
     this->fftRate = fftRate;
     this->fftSize = fftSize;
     inputBlockSize = sampleRate / 200.0f;
 
-    split.init(input);
+    // split.init(input);
+    inputBuffer.init(input);
+    split.init(&inputBuffer.out);
 
     reshape.init(&fftStream, fftSize, (sampleRate / fftRate) - fftSize);
     split.bindStream(&fftStream);
-    fftHandlerSink.init(&reshape.out, fftHandler, NULL);
+    fftHandlerSink.init(&reshape.out, fftHandler, fftHandlerCtx);
 }
 
 void SignalPath::setSampleRate(double sampleRate) {
@@ -45,12 +47,14 @@ double SignalPath::getSampleRate() {
 }
 
 void SignalPath::start() {
+    inputBuffer.start();
     split.start();
     reshape.start();
     fftHandlerSink.start();
 }
 
 void SignalPath::stop() {
+    inputBuffer.stop();
     split.stop();
     reshape.stop();
     fftHandlerSink.stop();
@@ -83,7 +87,8 @@ void SignalPath::removeVFO(std::string name) {
 }
 
 void SignalPath::setInput(dsp::stream<dsp::complex_t>* input) {
-    split.setInput(input);
+    // split.setInput(input);
+    inputBuffer.setInput(input);
 }
 
 void SignalPath::bindIQStream(dsp::stream<dsp::complex_t>* stream) {
@@ -111,4 +116,8 @@ void SignalPath::startFFT() {
 void SignalPath::stopFFT() {
     reshape.stop();
     fftHandlerSink.stop();
+}
+
+void SignalPath::setBuffering(bool enabled) {
+    inputBuffer.bypass = !enabled;
 }

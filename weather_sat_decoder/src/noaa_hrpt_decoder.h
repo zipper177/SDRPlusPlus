@@ -219,7 +219,7 @@ public:
             ImGui::BeginChild("AVHRRRGBChild");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
             avhrrRGBImage.draw();
-            ImGui::SetScrollHere(1.0f);
+            ImGui::SetScrollHereY(1.0f);
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -228,7 +228,7 @@ public:
             ImGui::BeginChild("AVHRR1Child");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
             avhrr1Image.draw();
-            ImGui::SetScrollHere(1.0f);
+            ImGui::SetScrollHereY(1.0f);
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -237,7 +237,7 @@ public:
             ImGui::BeginChild("AVHRR2Child");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
             avhrr2Image.draw();
-            ImGui::SetScrollHere(1.0f);
+            ImGui::SetScrollHereY(1.0f);
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -246,7 +246,7 @@ public:
             ImGui::BeginChild("AVHRR3Child");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
             avhrr3Image.draw();
-            ImGui::SetScrollHere(1.0f);
+            ImGui::SetScrollHereY(1.0f);
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -255,7 +255,7 @@ public:
             ImGui::BeginChild("AVHRR4Child");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
             avhrr4Image.draw();
-            ImGui::SetScrollHere(1.0f);
+            ImGui::SetScrollHereY(1.0f);
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -264,7 +264,7 @@ public:
             ImGui::BeginChild("AVHRR5Child");
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvailWidth());
             avhrr5Image.draw();
-            ImGui::SetScrollHere(1.0f);
+            ImGui::SetScrollHereY(1.0f);
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -289,7 +289,7 @@ private:
             if (compositeIn1.read() < 0) { return; }
             if (compositeIn2.read() < 0) { return; }
             
-            uint8_t* buf = avhrrRGBImage.aquireNextLine();
+            uint8_t* buf = avhrrRGBImage.acquireNextLine();
             float rg, b;
             for (int i = 0; i < 2048; i++) {
                 b = ((float)compositeIn1.readBuf[i] * 255.0f) / 1024.0f;
@@ -308,7 +308,7 @@ private:
 
     static void avhrr1Handler(uint16_t* data, int count, void* ctx) {
         NOAAHRPTDecoder* _this = (NOAAHRPTDecoder*)ctx;
-        uint8_t* buf = _this->avhrr1Image.aquireNextLine();
+        uint8_t* buf = _this->avhrr1Image.acquireNextLine();
         float val;
         for (int i = 0; i < 2048; i++) {
             val = ((float)data[i] * 255.0f) / 1024.0f;
@@ -325,7 +325,7 @@ private:
 
     static void avhrr2Handler(uint16_t* data, int count, void* ctx) {
         NOAAHRPTDecoder* _this = (NOAAHRPTDecoder*)ctx;
-        uint8_t* buf = _this->avhrr2Image.aquireNextLine();
+        uint8_t* buf = _this->avhrr2Image.acquireNextLine();
         float val;
         for (int i = 0; i < 2048; i++) {
             val = ((float)data[i] * 255.0f) / 1024.0f;
@@ -342,7 +342,7 @@ private:
 
     static void avhrr3Handler(uint16_t* data, int count, void* ctx) {
         NOAAHRPTDecoder* _this = (NOAAHRPTDecoder*)ctx;
-        uint8_t* buf = _this->avhrr3Image.aquireNextLine();
+        uint8_t* buf = _this->avhrr3Image.acquireNextLine();
         float val;
         for (int i = 0; i < 2048; i++) {
             val = ((float)data[i] * 255.0f) / 1024.0f;
@@ -356,7 +356,7 @@ private:
 
     static void avhrr4Handler(uint16_t* data, int count, void* ctx) {
         NOAAHRPTDecoder* _this = (NOAAHRPTDecoder*)ctx;
-        uint8_t* buf = _this->avhrr4Image.aquireNextLine();
+        uint8_t* buf = _this->avhrr4Image.acquireNextLine();
         float val;
         for (int i = 0; i < 2048; i++) {
             val = ((float)data[i] * 255.0f) / 1024.0f;
@@ -370,7 +370,7 @@ private:
 
     static void avhrr5Handler(uint16_t* data, int count, void* ctx) {
         NOAAHRPTDecoder* _this = (NOAAHRPTDecoder*)ctx;
-        uint8_t* buf = _this->avhrr5Image.aquireNextLine();
+        uint8_t* buf = _this->avhrr5Image.acquireNextLine();
         float val;
         for (int i = 0; i < 2048; i++) {
             val = ((float)data[i] * 255.0f) / 1024.0f;
@@ -485,7 +485,7 @@ private:
 
     static void visHandler(float* data, int count, void* ctx) {
         NOAAHRPTDecoder* _this = (NOAAHRPTDecoder*)ctx;
-        memcpy(_this->symDiag.aquireBuffer(), data, 1024 * sizeof(float));
+        memcpy(_this->symDiag.acquireBuffer(), data, 1024 * sizeof(float));
         _this->symDiag.releaseBuffer();
     }
 

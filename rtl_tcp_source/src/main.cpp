@@ -28,6 +28,7 @@ const double sampleRates[] = {
     1920000,
     2048000,
     2160000,
+    2400000,
     2560000,
     2880000,
     3200000
@@ -41,6 +42,7 @@ const char* sampleRatesTxt[] = {
     "1.92MHz",
     "2.048MHz",
     "2.16MHz",
+    "2.4MHz",
     "2.56MHz",
     "2.88MHz",
     "3.2MHz"
@@ -60,13 +62,15 @@ public:
         }
         srId = 7;
 
-        config.aquire();
+        config.acquire();
         std::string hostStr = config.conf["host"];
         port = config.conf["port"];
         directSamplingMode = config.conf["directSamplingMode"];
         rtlAGC = config.conf["rtlAGC"];
         tunerAGC = config.conf["tunerAGC"];
         gain = config.conf["gainIndex"];
+        biasTee = config.conf["biasTee"];
+        offsetTuning = config.conf["offsetTuning"];
         hostStr = hostStr.substr(0, 1023);
         strcpy(ip, hostStr.c_str());
         config.release();
@@ -126,6 +130,8 @@ private:
         _this->client.setDirectSampling(_this->directSamplingMode);
         _this->client.setAGCMode(_this->rtlAGC);
         _this->client.setGainIndex(_this->gain);
+        _this->client.setBiasTee(_this->biasTee);
+        _this->client.setOffsetTuning(_this->offsetTuning);
         _this->running = true;
         _this->workerThread = std::thread(worker, _this);
         spdlog::info("RTLTCPSourceModule '{0}': Start!", _this->name);
@@ -161,10 +167,18 @@ private:
         if (_this->running) { style::beginDisabled(); }
 
         ImGui::SetNextItemWidth(menuWidth - portWidth);
-        ImGui::InputText(CONCAT("##_ip_select_", _this->name), _this->ip, 1024);
+        if (ImGui::InputText(CONCAT("##_ip_select_", _this->name), _this->ip, 1024)) {
+            config.acquire();
+            config.conf["host"] = std::string(_this->ip);
+            config.release(true);
+        }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(portWidth);
-        ImGui::InputInt(CONCAT("##_port_select_", _this->name), &_this->port, 0);
+        if (ImGui::InputInt(CONCAT("##_port_select_", _this->name), &_this->port, 0)) {
+            config.acquire();
+            config.conf["port"] = _this->port;
+            config.release(true);
+        }
 
         ImGui::SetNextItemWidth(menuWidth);
         if (ImGui::Combo(CONCAT("##_rtltcp_sr_", _this->name), &_this->srId, _this->srTxt.c_str())) {
@@ -174,11 +188,25 @@ private:
 
         if (_this->running) { style::endDisabled(); }
 
-        ImGui::SetNextItemWidth(ImGui::CalcTextSize("OOOOOOOOOO").x);
-        if (ImGui::Combo(CONCAT("Direct Sampling##_rtltcp_ds_", _this->name), &_this->directSamplingMode, "Disabled\0I branch\0Q branch\0")) {
+        ImGui::Text("Direct Sampling");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
+        if (ImGui::Combo(CONCAT("##_rtltcp_ds_", _this->name), &_this->directSamplingMode, "Disabled\0I branch\0Q branch\0")) {
             if (_this->running) {
                 _this->client.setDirectSampling(_this->directSamplingMode);
                 _this->client.setGainIndex(_this->gain);
+            }
+        }
+
+        if (ImGui::Checkbox(CONCAT("Bias-T##_biast_select_", _this->name), &_this->biasTee)) {
+            if (_this->running) {
+                _this->client.setBiasTee(_this->biasTee);
+            }
+        }
+
+        if (ImGui::Checkbox(CONCAT("Offset Tuning##_biast_select_", _this->name), &_this->offsetTuning)) {
+            if (_this->running) {
+                _this->client.setOffsetTuning(_this->offsetTuning);
             }
         }
 
@@ -244,6 +272,8 @@ private:
     bool tunerAGC = false;
     int directSamplingMode = 0;
     int srId = 0;
+    bool biasTee = false;
+    bool offsetTuning = false;
 
     std::string srTxt = "";
 };
@@ -257,8 +287,19 @@ MOD_EXPORT void _INIT_() {
    defConf["rtlAGC"] = false;
    defConf["tunerAGC"] = false;
    defConf["gainIndex"] = 0;
+   defConf["biasTee"] = false;
+   defConf["offsetTuning"] = false;
    config.load(defConf);
    config.enableAutoSave();
+
+    config.acquire();
+    if (!config.conf.contains("biasTee")) {
+        config.conf["biasTee"] = false;
+    }
+    if (!config.conf.contains("offsetTuning")) {
+        config.conf["offsetTuning"] = false;
+    }
+    config.release(true);
 }
 
 MOD_EXPORT ModuleManager::Instance* _CREATE_INSTANCE_(std::string name) {

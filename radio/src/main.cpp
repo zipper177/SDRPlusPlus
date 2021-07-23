@@ -1,7 +1,7 @@
 #include <imgui.h>
-#include <watcher.h>
 #include <config.h>
 #include <core.h>
+#include <gui/gui.h>
 #include <gui/style.h>
 #include <signal_path/signal_path.h>
 #include <radio_demod.h>
@@ -38,7 +38,7 @@ public:
 
         ns.init(vfo->output);
 
-        config.aquire();
+        config.acquire();
         if (!config.conf.contains(name)) {
             config.conf[name]["selectedDemodId"] = 1;
         }
@@ -53,10 +53,10 @@ public:
         dsbDemod.init(name, vfo, audioSampRate, 6000, &config);
         rawDemod.init(name, vfo, audioSampRate, audioSampRate, &config);
         cwDemod.init(name, vfo, audioSampRate, 200, &config);
-        
+
         srChangeHandler.ctx = this;
         srChangeHandler.handler = sampleRateChangeHandler;
-        stream.init(wfmDemod.getOutput(), srChangeHandler, audioSampRate);
+        stream.init(wfmDemod.getOutput(), &srChangeHandler, audioSampRate);
         sigpath::sinkManager.registerStream(name, &stream);
 
         selectDemodById(demodId);
@@ -69,12 +69,19 @@ public:
     }
 
     ~RadioModule() {
-        
+        core::modComManager.unregisterInterface(name);
+        gui::menu.removeEntry(name);
+        stream.stop();
+        if (enabled) {
+            currentDemod->stop();
+            sigpath::vfoManager.deleteVFO(vfo);
+        }
+        sigpath::sinkManager.unregisterStream(name);
     }
 
     void enable() {
         double bw = gui::waterfall.getBandwidth();
-        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, std::clamp<double>(savedOffset, -bw/2.0, bw/2.0), 200000, 200000, 50000, 200000, false);
+        vfo = sigpath::vfoManager.createVFO(name, ImGui::WaterfallVFO::REF_CENTER, std::clamp<double>(0, -bw/2.0, bw/2.0), 200000, 200000, 50000, 200000, false);
 
         wfmDemod.setVFO(vfo);
         fmDemod.setVFO(vfo);
@@ -92,7 +99,6 @@ public:
 
     void disable() {
         currentDemod->stop();
-        savedOffset = vfo->getOffset();
         sigpath::vfoManager.deleteVFO(vfo);
         enabled = false;
     }
@@ -161,11 +167,16 @@ private:
     static void moduleInterfaceHandler(int code, void* in, void* out, void* ctx) {
         RadioModule* _this = (RadioModule*)ctx;
         if (code == RADIO_IFACE_CMD_GET_MODE) {
-            *(int*)out = _this->demodId;
+            int* _out = (int*)out;
+            *_out = _this->demodId;
         }
         else if (code == RADIO_IFACE_CMD_SET_MODE) {
-            int in = *(int*)in;
-            if (in != _this->demodId) { _this->selectDemodById(in); }
+            int* _in = (int*)in;
+            if (*_in != _this->demodId) { _this->selectDemodById(*_in); }
+        }
+        else if (code == RADIO_IFACE_CMD_SET_BANDWIDTH) {
+            float* _in = (float*)in;
+            _this->currentDemod->setBandwidth(*_in, true);
         }
     }
 
@@ -189,7 +200,7 @@ private:
         if (id == 5) { selectDemod(&cwDemod); }
         if (id == 6) { selectDemod(&lsbDemod); }
         if (id == 7) { selectDemod(&rawDemod); }
-        config.aquire();
+        config.acquire();
         config.conf[name]["selectedDemodId"] = demodId;
         config.release(true);
     }
@@ -198,7 +209,6 @@ private:
     bool enabled = true;
     int demodId = 0;
     float audioSampRate = 48000;
-    double savedOffset = 0;
     Demodulator* currentDemod = NULL;
 
     VFOManager::VFO* vfo;

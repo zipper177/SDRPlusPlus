@@ -1,6 +1,7 @@
 #include <gui/widgets/menu.h>
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
+#include <gui/style.h>
 
 Menu::Menu() {
 
@@ -28,15 +29,69 @@ bool Menu::draw(bool updateStates) {
     bool changed = false;
     float menuWidth = ImGui::GetContentRegionAvailWidth();
     ImGuiWindow* window = ImGui::GetCurrentWindow();
+
+    int displayedCount = 0;
+    int rawId = 0;
+
+    ImU32 textColor = ImGui::GetColorU32(ImGuiCol_Text);
+
     for (MenuOption_t& opt : order) {
+        rawId++;
         if (items.find(opt.name) == items.end()) {
             continue;
         }
+        if (opt.name == draggedMenuName) {
+            ImGui::BeginTooltip();
+            ImGui::Text("%s", draggedMenuName.c_str());
+            ImGui::EndTooltip();
+            continue;
+        }
+
+        if (displayedCount == insertBefore && !draggedMenuName.empty()) {
+            if (updateStates) { ImGui::SetNextItemOpen(false); }
+            ImVec2 posMin = ImGui::GetCursorScreenPos();
+            ImVec2 posMax = ImVec2(posMin.x + menuWidth, posMin.y + ImGui::GetFrameHeight());
+            style::beginDisabled();
+            ImRect orignalRect = window->WorkRect;
+            ImGui::CollapsingHeader((draggedMenuName + "##sdrpp_main_menu_dragging").c_str());
+            if (items[draggedOpt.name].inst != NULL) {
+                window->WorkRect = orignalRect;
+                ImVec2 pos = ImGui::GetCursorPos();
+                ImGui::SetCursorPosX(pos.x + menuWidth - ImGui::GetTextLineHeight() - 6);
+                ImGui::SetCursorPosY(pos.y - 10 - ImGui::GetTextLineHeight());
+                bool enabled = items[draggedOpt.name].inst->isEnabled();
+                ImGui::Checkbox(("##_menu_checkbox_" + draggedOpt.name).c_str(), &enabled);
+                ImGui::SetCursorPos(pos);
+            }
+            style::endDisabled();
+            window->DrawList->AddRect(posMin, posMax, textColor);
+        }
+        displayedCount++;
+        
         MenuItem_t& item = items[opt.name];
+        
 
         ImRect orginalRect = window->WorkRect;
         if (item.inst != NULL) {
             window->WorkRect = ImRect(orginalRect.Min, ImVec2(orginalRect.Max.x - ImGui::GetTextLineHeight() - 6, orginalRect.Max.y));
+        }
+
+        ImVec2 posMin = ImGui::GetCursorScreenPos();
+        ImVec2 posMax = ImVec2(posMin.x + menuWidth, posMin.y + ImGui::GetFrameHeight());
+
+        headerTops[displayedCount-1] = posMin.y;
+        optionIDs[displayedCount-1] = rawId-1;
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsMouseHoveringRect(posMin, posMax)) {
+            menuClicked = true;
+            clickedMenuName = opt.name;
+        }
+
+        if (menuClicked && ImGui::IsMouseDragging(ImGuiMouseButton_Left) && draggedMenuName.empty() && clickedMenuName == opt.name) {
+            draggedMenuName = opt.name;
+            draggedId = rawId-1;
+            draggedOpt = opt;
+            continue;
         }
 
         if (updateStates) { ImGui::SetNextItemOpen(opt.open); }
@@ -49,6 +104,7 @@ bool Menu::draw(bool updateStates) {
                 bool enabled = item.inst->isEnabled();
                 if (ImGui::Checkbox(("##_menu_checkbox_" + opt.name).c_str(), &enabled)) {
                     enabled ? item.inst->enable() : item.inst->disable();
+                    changed = true;
                 }
                 ImGui::SetCursorPos(pos);
             }
@@ -70,6 +126,7 @@ bool Menu::draw(bool updateStates) {
             bool enabled = item.inst->isEnabled();
             if (ImGui::Checkbox(("##_menu_checkbox_" + opt.name).c_str(), &enabled)) {
                 enabled ? item.inst->enable() : item.inst->disable();
+                changed = true;
             }
             ImGui::SetCursorPos(pos);
 
@@ -83,6 +140,68 @@ bool Menu::draw(bool updateStates) {
             changed = true;
         }
     }
+
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && menuClicked) {
+        
+        if (!draggedMenuName.empty()) {
+            // Move menu
+            order.erase(order.begin() + draggedId);
+
+            if (insertBefore == displayedCount) {
+                order.push_back(draggedOpt);
+            }
+            else if (insertBeforeName != "") {
+                int beforeId = 0;
+                for (int i = 0; i < order.size(); i++) {
+                    if (order[i].name == insertBeforeName) {
+                        beforeId = i;
+                        break;
+                    }
+                }
+                order.insert(order.begin() + beforeId, draggedOpt);
+            }
+            changed = true;
+        }
+        
+        menuClicked = false;
+        draggedMenuName = "";
+        insertBeforeName = "";
+        insertBefore = -1;
+    }
+
+
+    if (insertBefore == displayedCount && !draggedMenuName.empty()) {
+        if (updateStates) { ImGui::SetNextItemOpen(false); }
+        ImVec2 posMin = ImGui::GetCursorScreenPos();
+        ImVec2 posMax = ImVec2(posMin.x + menuWidth, posMin.y + ImGui::GetFrameHeight());
+        style::beginDisabled();
+        ImRect orignalRect = window->WorkRect;
+        ImGui::CollapsingHeader((draggedMenuName + "##sdrpp_main_menu_dragging").c_str());
+        if (items[draggedOpt.name].inst != NULL) {
+            window->WorkRect = orignalRect;
+            ImVec2 pos = ImGui::GetCursorPos();
+            ImGui::SetCursorPosX(pos.x + menuWidth - ImGui::GetTextLineHeight() - 6);
+            ImGui::SetCursorPosY(pos.y - 10 - ImGui::GetTextLineHeight());
+            bool enabled = items[draggedOpt.name].inst->isEnabled();
+            ImGui::Checkbox(("##_menu_checkbox_" + draggedOpt.name).c_str(), &enabled);
+            ImGui::SetCursorPos(pos);
+        }
+        style::endDisabled();
+        window->DrawList->AddRect(posMin, posMax, textColor);
+    }
+
+    if (!draggedMenuName.empty()) {
+        insertBefore = displayedCount;
+        ImVec2 mPos = ImGui::GetMousePos();
+        for (int i = 0; i < displayedCount; i++) {
+            if (headerTops[i] > mPos.y) {
+                insertBefore = i;
+                insertBeforeName = order[optionIDs[i]].name;
+                break;
+            }
+        }
+    }
+
     return changed;
 }
 

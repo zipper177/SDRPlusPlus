@@ -7,7 +7,7 @@
 class SignalPath {
 public:
     SignalPath();
-    void init(uint64_t sampleRate, int fftRate, int fftSize, dsp::stream<dsp::complex_t>* input, dsp::complex_t* fftBuffer, void fftHandler(dsp::complex_t*,int,void*));
+    void init(uint64_t sampleRate, int fftRate, int fftSize, dsp::stream<dsp::complex_t>* input, dsp::complex_t* fftBuffer, void fftHandler(dsp::complex_t*,int,void*), void* fftHandlerCtx);
     void start();
     void stop();
     void setSampleRate(double sampleRate);
@@ -20,6 +20,9 @@ public:
     void setFFTSize(int size);
     void startFFT();
     void stopFFT();
+    void setBuffering(bool enabled);
+
+    dsp::SampleFrameBuffer<dsp::complex_t> inputBuffer;
 
 private:
     struct VFO_t {
@@ -41,4 +44,5 @@ private:
     double fftRate;
     int fftSize;
     int inputBlockSize;
+    bool bufferingEnabled = false;
 };

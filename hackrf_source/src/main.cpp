@@ -95,7 +95,7 @@ public:
 
         refresh();
 
-        config.aquire();
+        config.acquire();
         std::string confSerial = config.conf["device"];
         config.release();
         selectBySerial(confSerial);
@@ -151,7 +151,7 @@ public:
         }
 
         bool created = false;
-        config.aquire();
+        config.acquire();
         if (!config.conf["devices"].contains(serial)) {
             config.conf["devices"][serial]["sampleRate"] = 2000000;
             config.conf["devices"][serial]["biasT"] = false;
@@ -228,9 +228,9 @@ private:
             return;
         }
 
-        int err = hackrf_open_by_serial(_this->selectedSerial.c_str(), &_this->openDev);
-        if (err != 0) {
-            spdlog::error("Could not open HackRF {0}", _this->selectedSerial);
+        hackrf_error err = (hackrf_error)hackrf_open_by_serial(_this->selectedSerial.c_str(), &_this->openDev);
+        if (err != HACKRF_SUCCESS) {
+            spdlog::error("Could not open HackRF {0}: {1}", _this->selectedSerial, hackrf_error_name(err));
             return;
         }
 
@@ -257,7 +257,10 @@ private:
         _this->running = false;
         _this->stream.stopWriter();
         // TODO: Stream stop
-        hackrf_close(_this->openDev);
+        hackrf_error err = (hackrf_error)hackrf_close(_this->openDev);
+        if (err != HACKRF_SUCCESS) {
+            spdlog::error("Could not close HackRF {0}: {1}", _this->selectedSerial, hackrf_error_name(err));
+        }
         _this->stream.clearWriteStop();
         spdlog::info("HackRFSourceModule '{0}': Stop!", _this->name);
     }
@@ -280,7 +283,7 @@ private:
         ImGui::SetNextItemWidth(menuWidth);
         if (ImGui::Combo(CONCAT("##_hackrf_dev_sel_", _this->name), &_this->devId, _this->devListTxt.c_str())) {
             _this->selectedSerial = _this->devList[_this->devId];
-            config.aquire();
+            config.acquire();
             config.conf["device"] = _this->selectedSerial;
             config.release(true);
         }
@@ -288,7 +291,7 @@ private:
         if (ImGui::Combo(CONCAT("##_hackrf_sr_sel_", _this->name), &_this->srId, sampleRatesTxt)) {
             _this->sampleRate = sampleRates[_this->srId];
             core::setInputSampleRate(_this->sampleRate);
-            config.aquire();
+            config.acquire();
             config.conf["devices"][_this->selectedSerial]["sampleRate"] = _this->sampleRate;
             config.release(true);
         }
@@ -298,6 +301,7 @@ private:
         if (ImGui::Button(CONCAT("Refresh##_hackrf_refr_", _this->name), ImVec2(refreshBtnWdith, 0))) {
             _this->refresh();
             _this->selectBySerial(_this->selectedSerial);
+	    core::setInputSampleRate(_this->sampleRate);
         }
 
         if (_this->running) { style::endDisabled(); }
@@ -309,7 +313,7 @@ private:
             if (_this->running) {
                 hackrf_set_baseband_filter_bandwidth(_this->openDev, _this->bandwidthIdToBw(_this->bwId));
             }
-            config.aquire();
+            config.acquire();
             config.conf["devices"][_this->selectedSerial]["bandwidth"] = _this->bwId;
             config.release(true);
         }
@@ -318,7 +322,7 @@ private:
             if (_this->running) {
                 hackrf_set_antenna_enable(_this->openDev, _this->biasT);
             }
-            config.aquire();
+            config.acquire();
             config.conf["devices"][_this->selectedSerial]["biasT"] = _this->biasT;
             config.release(true);
         }
@@ -327,7 +331,7 @@ private:
             if (_this->running) {
                 hackrf_set_amp_enable(_this->openDev, _this->amp);
             }
-            config.aquire();
+            config.acquire();
             config.conf["devices"][_this->selectedSerial]["amp"] = _this->amp;
             config.release(true);
         }
@@ -339,7 +343,7 @@ private:
             if (_this->running) {
                 hackrf_set_lna_gain(_this->openDev, _this->lna);
             }
-            config.aquire();
+            config.acquire();
             config.conf["devices"][_this->selectedSerial]["lnaGain"] = (int)_this->lna;
             config.release(true);
         }
@@ -351,7 +355,7 @@ private:
             if (_this->running) {
                 hackrf_set_vga_gain(_this->openDev, _this->vga);
             }
-            config.aquire();
+            config.acquire();
             config.conf["devices"][_this->selectedSerial]["vgaGain"] = (int)_this->vga;
             config.release(true);
         }   
@@ -361,10 +365,7 @@ private:
         HackRFSourceModule* _this = (HackRFSourceModule*)transfer->rx_ctx;
         int count = transfer->valid_length / 2;
         int8_t* buffer = (int8_t*)transfer->buffer;
-        for (int i = 0; i < count; i++) {
-            _this->stream.writeBuf[i].re = (float)buffer[i * 2] / 128.0f;
-            _this->stream.writeBuf[i].im = (float)buffer[(i * 2) + 1] / 128.0f;
-        }
+        volk_8i_s32f_convert_32f((float*)_this->stream.writeBuf, buffer, 128.0f, count*2);
         if (!_this->stream.swap(count)) { return -1; }
         return 0;
     }

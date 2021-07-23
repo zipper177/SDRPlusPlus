@@ -7,7 +7,7 @@
 #include <dsp/processing.h>
 #include <dsp/sink.h>
 #include <mutex>
-#include <event.h>
+#include <utils/event.h>
 #include <vector>
 
 class SinkManager {
@@ -25,9 +25,9 @@ public:
     class Stream {
     public:
         Stream() {}
-        Stream(dsp::stream<dsp::stereo_t>* in, const EventHandler<float>& srChangeHandler, float sampleRate);
+        Stream(dsp::stream<dsp::stereo_t>* in, EventHandler<float>* srChangeHandler, float sampleRate);
 
-        void init(dsp::stream<dsp::stereo_t>* in, const EventHandler<float>& srChangeHandler, float sampleRate);
+        void init(dsp::stream<dsp::stereo_t>* in, EventHandler<float>* srChangeHandler, float sampleRate);
 
         void start();
         void stop();
@@ -109,6 +109,9 @@ public:
     void showMenu();
 
     std::vector<std::string> getStreamNames();
+
+    Event<std::string> streamRegisteredEvnt;
+    Event<std::string> streamUnregisteredEvnt;
 
 private:
     void loadStreamConfig(std::string name);

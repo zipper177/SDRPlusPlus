@@ -19,12 +19,17 @@ set_target_properties(bladerf_source PROPERTIES PREFIX "")
 
 if (MSVC)
     # Lib path
-    target_link_directories(sdrpp_core PUBLIC "C:/Program Files/PothosSDR/bin/")
+    target_link_directories(bladerf_source PUBLIC "C:/Program Files/PothosSDR/bin/")
 
     target_link_libraries(bladerf_source PUBLIC bladeRF)
 else (MSVC)
     # Not in pkg-config
-    target_link_libraries(bladerf_source PUBLIC libbladeRF)
+    target_link_libraries(bladerf_source PUBLIC bladeRF)
+
+    # Include it because for some reason pkgconfig doesn't look here?
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        target_include_directories(airspyhf_source PUBLIC "/usr/local/include")
+    endif()
 endif ()
 
 # Install directives

@@ -1,5 +1,4 @@
 #include <imgui.h>
-#include <watcher.h>
 #include <config.h>
 #include <core.h>
 #include <gui/style.h>
@@ -205,7 +204,7 @@ private:
 
     static void symSinkHandler(float* data, int count, void* ctx) {
         Falcon9DecoderModule* _this = (Falcon9DecoderModule*)ctx;
-        float* buf = _this->symDiag.aquireBuffer();
+        float* buf = _this->symDiag.acquireBuffer();
         memcpy(buf, data, 1024*sizeof(float));
         _this->symDiag.releaseBuffer();
     }

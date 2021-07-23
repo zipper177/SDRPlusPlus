@@ -23,35 +23,48 @@ public:
         bw = bandWidth;
         _config = config;
 
-        _config->aquire();
+        _config->acquire();
         if(_config->conf.contains(prefix)) {
             if(!_config->conf[prefix].contains("WFM")) {
-                if (!_config->conf[prefix]["WFM"].contains("bandwidth")) { _config->conf[prefix]["WFM"]["bandwidth"] = bw; }
-                if (!_config->conf[prefix]["WFM"].contains("snapInterval")) { _config->conf[prefix]["WFM"]["snapInterval"] = snapInterval; }
-                if (!_config->conf[prefix]["WFM"].contains("deempMode")) { _config->conf[prefix]["WFM"]["deempMode"] = deempId; }
-                if (!_config->conf[prefix]["WFM"].contains("squelchLevel")) { _config->conf[prefix]["WFM"]["squelchLevel"] = squelchLevel; }
+                _config->conf[prefix]["WFM"]["bandwidth"] = bw;
+                _config->conf[prefix]["WFM"]["snapInterval"] = snapInterval;
+                _config->conf[prefix]["WFM"]["deempMode"] = deempId;
+                _config->conf[prefix]["WFM"]["squelchLevel"] = squelchLevel;
+                _config->conf[prefix]["WFM"]["stereo"] = false;
             }
+
+            // Correct for new settings
+            if (!config->conf[prefix]["WFM"].contains("stereo")) { _config->conf[prefix]["WFM"]["stereo"] = false;}
+
             json conf = _config->conf[prefix]["WFM"];
             bw = conf["bandwidth"];
             snapInterval = conf["snapInterval"];
             deempId = conf["deempMode"];
             squelchLevel = conf["squelchLevel"];
+            stereo = conf["stereo"];
         }
         else {
             _config->conf[prefix]["WFM"]["bandwidth"] = bw;
             _config->conf[prefix]["WFM"]["snapInterval"] = snapInterval;
             _config->conf[prefix]["WFM"]["deempMode"] = deempId; 
             _config->conf[prefix]["WFM"]["squelchLevel"] = squelchLevel;
+            _config->conf[prefix]["WFM"]["stereo"] = false;
         }
         _config->release(true);
         
         squelch.init(_vfo->output, squelchLevel);
         
         demod.init(&squelch.out, bbSampRate, bw / 2.0f);
+        demodStereo.init(&squelch.out, bbSampRate, bw / 2.0f);
 
         float audioBW = std::min<float>(audioSampleRate / 2.0f, 16000.0f);
         win.init(audioBW, audioBW, bbSampRate);
-        resamp.init(&demod.out, &win, bbSampRate, audioSampRate);
+        if (stereo) {
+            resamp.init(demodStereo.out, &win, bbSampRate, audioSampRate);
+        }
+        else {
+            resamp.init(&demod.out, &win, bbSampRate, audioSampRate);
+        }
         win.setSampleRate(bbSampRate * resamp.getInterpolation());
         resamp.updateWindow(&win);
 
@@ -63,7 +76,12 @@ public:
 
     void start() {
         squelch.start();
-        demod.start();
+        if (stereo) {
+            demodStereo.start();
+        }
+        else {
+            demod.start();
+        }
         resamp.start();
         deemp.start();
         running = true;
@@ -71,7 +89,12 @@ public:
 
     void stop() {
         squelch.stop();
-        demod.stop();
+        if (stereo) {
+            demodStereo.stop();
+        }
+        else {
+            demod.stop();
+        }
         resamp.stop();
         deemp.stop();
         running = false;
@@ -131,7 +154,7 @@ public:
         if (ImGui::InputFloat(("##_radio_wfm_bw_" + uiPrefix).c_str(), &bw, 1, 100, "%.0f", 0)) {
             bw = std::clamp<float>(bw, bwMin, bwMax);
             setBandwidth(bw);
-            _config->aquire();
+            _config->acquire();
             _config->conf[uiPrefix]["WFM"]["bandwidth"] = bw;
             _config->release(true);
         }
@@ -139,7 +162,7 @@ public:
             if (_vfo->getBandwidthChanged()) {
                 bw = _vfo->getBandwidth();
                 setBandwidth(bw, false);
-                _config->aquire();
+                _config->acquire();
                 _config->conf[uiPrefix]["WFM"]["bandwidth"] = bw;
                 _config->release(true);
             }
@@ -151,7 +174,7 @@ public:
         if (ImGui::InputFloat(("##_radio_wfm_snap_" + uiPrefix).c_str(), &snapInterval, 1, 100, "%.0f", 0)) {
             if (snapInterval < 1) { snapInterval = 1; }
             setSnapInterval(snapInterval);
-            _config->aquire();
+            _config->acquire();
             _config->conf[uiPrefix]["WFM"]["snapInterval"] = snapInterval;
             _config->release(true);
         }
@@ -162,7 +185,7 @@ public:
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
         if (ImGui::Combo(("##_radio_wfm_deemp_" + uiPrefix).c_str(), &deempId, deempModes)) {
             setDeempIndex(deempId);
-            _config->aquire();
+            _config->acquire();
             _config->conf[uiPrefix]["WFM"]["deempMode"] = deempId;
             _config->release(true);
         }
@@ -172,8 +195,15 @@ public:
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
         if (ImGui::SliderFloat(("##_radio_wfm_sqelch_" + uiPrefix).c_str(), &squelchLevel, -100.0f, 0.0f, "%.3fdB")) {
             squelch.setLevel(squelchLevel);
-            _config->aquire();
+            _config->acquire();
             _config->conf[uiPrefix]["WFM"]["squelchLevel"] = squelchLevel;
+            _config->release(true);
+        }
+
+        if (ImGui::Checkbox("Stereo##radio_wfm_demod", &stereo)) {
+            setStereo(stereo);
+            _config->acquire();
+            _config->conf[uiPrefix]["WFM"]["stereo"] = stereo;
             _config->release(true);
         }
     }
@@ -192,12 +222,31 @@ public:
         _vfo->setSnapInterval(snapInterval);
     }
 
-private:
     void setBandwidth(float bandWidth, bool updateWaterfall = true) {
+        bandWidth = std::clamp<float>(bandWidth, bwMin, bwMax);
         bw = bandWidth;
         _vfo->setBandwidth(bw, updateWaterfall);
         demod.setDeviation(bw / 2.0f);
+        demodStereo.setDeviation(bw / 2.0f);
     }
+
+    void setStereo(bool enabled) {
+        if (running) {
+            demod.stop();
+            demodStereo.stop();
+        }
+
+        if (enabled) {
+            resamp.setInput(demodStereo.out);
+            if (running) { demodStereo.start(); }
+        }
+        else {
+            resamp.setInput(&demod.out);
+            if (running) { demod.start(); }
+        }
+    }
+
+private:
 
     const float bwMax = 250000;
     const float bwMin = 50000;
@@ -210,13 +259,17 @@ private:
     float audioSampRate = 48000;
     float squelchLevel = -100.0f;
     float bw = 200000;
+    bool stereo = false;
     int deempId = 0;
     float tau = 50e-6;
     bool running = false;
 
     VFOManager::VFO* _vfo;
     dsp::Squelch squelch;
+
     dsp::FMDemod demod;
+    dsp::StereoFMDemod demodStereo;
+
     dsp::filter_window::BlackmanWindow win;
     dsp::PolyphaseResampler<dsp::stereo_t> resamp;
     dsp::BFMDeemp deemp;

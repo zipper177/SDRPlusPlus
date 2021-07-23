@@ -11,26 +11,26 @@
 SDRPP_MOD_INFO {
     /* Name:            */ "discord_integration",
     /* Description:     */ "Discord Rich Presence module for SDR++",
-    /* Author:          */ "Starman0620;Ryzerth",
+    /* Author:          */ "Cam K.;Ryzerth",
     /* Version:         */ 0, 0, 2,
     /* Max instances    */ 1
 };
 
 #define DISCORD_APP_ID      "834590435708108860"
 
-class PresenceModule : public ModuleManager::Instance {
+class DiscordIntegrationModule : public ModuleManager::Instance {
 public:
-    PresenceModule(std::string name) {
+    DiscordIntegrationModule(std::string name) {
         this->name = name;
 
         // Change to timer start later on
         workerRunning = true;
-        workerThread = std::thread(&PresenceModule::worker, this);
+        workerThread = std::thread(&DiscordIntegrationModule::worker, this);
 
         startPresence();
     }
 
-    ~PresenceModule() {
+    ~DiscordIntegrationModule() {
         // Change to timer stop later on
         workerRunning = false;
         if (workerThread.joinable()) { workerThread.join(); }
@@ -39,7 +39,7 @@ public:
     void enable() {
         // Change to timer start later on
         workerRunning = true;
-        workerThread = std::thread(&PresenceModule::worker, this);
+        workerThread = std::thread(&DiscordIntegrationModule::worker, this);
         enabled = true;
     }
 
@@ -73,6 +73,8 @@ private:
     }
 
     void updatePresence() {
+        char freq[32];
+        char mode[32];
         double selectedFreq = gui::freqSelect.frequency;
         std::string selectedName = gui::waterfall.selectedVFO;
         strcpy(mode, "Raw");
@@ -123,6 +125,8 @@ private:
         presence.details = "Initializing rich presence...";
         presence.startTimestamp = time(0);
         presence.largeImageKey = "sdrpp_large";
+        presence.smallImageKey = "github";
+        presence.smallImageText = "SDRPlusPlus on GitHub";
         Discord_UpdatePresence(&presence);
     }
 
@@ -132,8 +136,6 @@ private:
     // Rich Presence
     DiscordRichPresence presence;
     double lastFreq;
-    char* freq = new char[1024];
-    char* mode = new char[1024];
     std::string lastMode = "";
 
     // Threading
@@ -148,11 +150,11 @@ MOD_EXPORT void _INIT_() {
 }
 
 MOD_EXPORT ModuleManager::Instance* _CREATE_INSTANCE_(std::string name) {
-    return new PresenceModule(name);
+    return new DiscordIntegrationModule(name);
 }
 
 MOD_EXPORT void _DELETE_INSTANCE_(void* instance) {
-    delete (PresenceModule*)instance;
+    delete (DiscordIntegrationModule*)instance;
 }
 
 MOD_EXPORT void _END_() {

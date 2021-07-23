@@ -1,6 +1,7 @@
 #include <config.h>
 #include <spdlog/spdlog.h>
 #include <fstream>
+
 #include <filesystem>
 
 ConfigManager::ConfigManager() {
@@ -65,7 +66,7 @@ void ConfigManager::disableAutoSave() {
     }
 }
 
-void ConfigManager::aquire() {
+void ConfigManager::acquire() {
     mtx.lock();
 }
 

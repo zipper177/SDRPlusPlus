@@ -1,8 +1,8 @@
 #include <imgui.h>
-#include <watcher.h>
 #include <config.h>
 #include <core.h>
 #include <gui/style.h>
+#include <gui/gui.h>
 #include <signal_path/signal_path.h>
 #include <module.h>
 #include <options.h>

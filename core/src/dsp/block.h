@@ -24,10 +24,13 @@ namespace dsp {
         virtual void init() {}
 
         virtual ~generic_block() {
+            if (!_block_init) { return; }
             stop();
+            _block_init = false;
         }
 
         virtual void start() {
+            assert(_block_init);
             std::lock_guard<std::mutex> lck(ctrlMtx);
             if (running) {
                 return;
@@ -37,6 +40,7 @@ namespace dsp {
         }
 
         virtual void stop() {
+            assert(_block_init);
             std::lock_guard<std::mutex> lck(ctrlMtx);
             if (!running) {
                 return;
@@ -46,6 +50,7 @@ namespace dsp {
         }
 
         void tempStart() {
+            assert(_block_init);
             if (tempStopped) {
                 doStart();
                 tempStopped = false;
@@ -53,13 +58,17 @@ namespace dsp {
         }
 
         void tempStop() {
+            assert(_block_init);
             if (running && !tempStopped) {
                 doStop();
                 tempStopped = true;
             }
         }
 
-        virtual int calcOutSize(int inSize) { return inSize; }
+        virtual int calcOutSize(int inSize) {
+            assert(_block_init);
+            return inSize;
+        }
 
         virtual int run() = 0;
         
@@ -70,7 +79,7 @@ namespace dsp {
             while (run() >= 0);
         }
 
-        void aquire() {
+        void acquire() {
             ctrlMtx.lock();
         }
 
@@ -78,19 +87,19 @@ namespace dsp {
             ctrlMtx.unlock();
         }
 
-        void registerInput(untyped_steam* inStream) {
+        void registerInput(untyped_stream* inStream) {
             inputs.push_back(inStream);
         }
 
-        void unregisterInput(untyped_steam* inStream) {
+        void unregisterInput(untyped_stream* inStream) {
             inputs.erase(std::remove(inputs.begin(), inputs.end(), inStream), inputs.end());
         }
 
-        void registerOutput(untyped_steam* outStream) {
+        void registerOutput(untyped_stream* outStream) {
             outputs.push_back(outStream);
         }
 
-        void unregisterOutput(untyped_steam* outStream) {
+        void unregisterOutput(untyped_stream* outStream) {
             outputs.erase(std::remove(outputs.begin(), outputs.end(), outStream), outputs.end());
         }
 
@@ -119,16 +128,17 @@ namespace dsp {
             }
         }
 
-        std::vector<untyped_steam*> inputs;
-        std::vector<untyped_steam*> outputs;
+    protected:
+        bool _block_init = false;
+
+        std::mutex ctrlMtx;
+
+        std::vector<untyped_stream*> inputs;
+        std::vector<untyped_stream*> outputs;
 
         bool running = false;
         bool tempStopped = false;
-
         std::thread workerThread;
-
-    protected:
-        std::mutex ctrlMtx;
 
     };
 
@@ -138,10 +148,13 @@ namespace dsp {
         virtual void init() {}
 
         virtual ~generic_hier_block() {
+            if (!_block_init) { return; }
             stop();
+            _block_init = false;
         }
 
         virtual void start() {
+            assert(_block_init);
             std::lock_guard<std::mutex> lck(ctrlMtx);
             if (running) {
                 return;
@@ -151,6 +164,7 @@ namespace dsp {
         }
 
         virtual void stop() {
+            assert(_block_init);
             std::lock_guard<std::mutex> lck(ctrlMtx);
             if (!running) {
                 return;
@@ -160,6 +174,7 @@ namespace dsp {
         }
 
         void tempStart() {
+            assert(_block_init);
             if (tempStopped) {
                 doStart();
                 tempStopped = false;
@@ -167,13 +182,17 @@ namespace dsp {
         }
 
         void tempStop() {
+            assert(_block_init);
             if (running && !tempStopped) {
                 doStop();
                 tempStopped = true;
             }
         }
 
-        virtual int calcOutSize(int inSize) { return inSize; }
+        virtual int calcOutSize(int inSize) {
+            assert(_block_init);
+            return inSize;
+        }
 
         friend BLOCK;
 
@@ -203,6 +222,7 @@ namespace dsp {
         bool running = false;
 
     protected:
+        bool _block_init = false;
         std::mutex ctrlMtx;
 
     };

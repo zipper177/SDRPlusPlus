@@ -8,6 +8,9 @@
 #include <dsp/pll.h>
 #include <dsp/clock_recovery.h>
 #include <dsp/math.h>
+#include <dsp/convertion.h>
+#include <dsp/audio.h>
+#include <dsp/stereo_fm.h>
 
 #define FAST_ATAN2_COEF1    FL_M_PI / 4.0f
 #define FAST_ATAN2_COEF2    3.0f * FAST_ATAN2_COEF1
@@ -44,9 +47,11 @@ namespace dsp {
             phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
             generic_block<FloatFMDemod>::registerInput(_in);
             generic_block<FloatFMDemod>::registerOutput(&out);
+            generic_block<FloatFMDemod>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<FloatFMDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<FloatFMDemod>::ctrlMtx);
             generic_block<FloatFMDemod>::tempStop();
             generic_block<FloatFMDemod>::unregisterInput(_in);
@@ -56,6 +61,7 @@ namespace dsp {
         }
 
         void setSampleRate(float sampleRate) {
+            assert(generic_block<FloatFMDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<FloatFMDemod>::ctrlMtx);
             generic_block<FloatFMDemod>::tempStop();
             _sampleRate = sampleRate;
@@ -64,10 +70,12 @@ namespace dsp {
         }
 
         float getSampleRate() {
+            assert(generic_block<FloatFMDemod>::_block_init);
             return _sampleRate;
         }
 
         void setDeviation(float deviation) {
+            assert(generic_block<FloatFMDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<FloatFMDemod>::ctrlMtx);
             generic_block<FloatFMDemod>::tempStop();
             _deviation = deviation;
@@ -76,6 +84,7 @@ namespace dsp {
         }
 
         float getDeviation() {
+            assert(generic_block<FloatFMDemod>::_block_init);
             return _deviation;
         }
 
@@ -121,9 +130,11 @@ namespace dsp {
             phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
             generic_block<FMDemod>::registerInput(_in);
             generic_block<FMDemod>::registerOutput(&out);
+            generic_block<FMDemod>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<FMDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             generic_block<FMDemod>::unregisterInput(_in);
@@ -133,6 +144,7 @@ namespace dsp {
         }
 
         void setSampleRate(float sampleRate) {
+            assert(generic_block<FMDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<FMDemod>::ctrlMtx);
             generic_block<FMDemod>::tempStop();
             _sampleRate = sampleRate;
@@ -141,15 +153,18 @@ namespace dsp {
         }
 
         float getSampleRate() {
+            assert(generic_block<FMDemod>::_block_init);
             return _sampleRate;
         }
 
         void setDeviation(float deviation) {
+            assert(generic_block<FMDemod>::_block_init);
             _deviation = deviation;
             phasorSpeed = (2 * FL_M_PI) / (_sampleRate / _deviation);
         }
 
         float getDeviation() {
+            assert(generic_block<FMDemod>::_block_init);
             return _deviation;
         }
 
@@ -194,9 +209,11 @@ namespace dsp {
             _in = in;
             generic_block<AMDemod>::registerInput(_in);
             generic_block<AMDemod>::registerOutput(&out);
+            generic_block<AMDemod>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<AMDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<AMDemod>::ctrlMtx);
             generic_block<AMDemod>::tempStop();
             generic_block<AMDemod>::unregisterInput(_in);
@@ -213,12 +230,9 @@ namespace dsp {
 
             _in->flush();
 
-            float avg;
-            volk_32f_accumulator_s32f(&avg, out.writeBuf, count);
-            avg /= (float)count;
-
             for (int i = 0; i < count; i++) {
                 out.writeBuf[i] -= avg;
+                avg += out.writeBuf[i] * 10e-4;
             }
 
             if (!out.swap(count)) { return -1; }
@@ -229,6 +243,7 @@ namespace dsp {
 
     private:
         stream<complex_t>* _in;
+        float avg = 0;
 
     };
 
@@ -239,8 +254,10 @@ namespace dsp {
         SSBDemod(stream<complex_t>* in, float sampleRate, float bandWidth, int mode) { init(in, sampleRate, bandWidth, mode); }
 
         ~SSBDemod() {
+            if (!generic_block<SSBDemod>::_block_init) { return; }
             generic_block<SSBDemod>::stop();
             delete[] buffer;
+            generic_block<SSBDemod>::_block_init = false;
         }
 
         enum {
@@ -269,9 +286,11 @@ namespace dsp {
             buffer = new lv_32fc_t[STREAM_BUFFER_SIZE];
             generic_block<SSBDemod>::registerInput(_in);
             generic_block<SSBDemod>::registerOutput(&out);
+            generic_block<SSBDemod>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<SSBDemod>::_block_init);
             std::lock_guard<std::mutex> lck(generic_block<SSBDemod>::ctrlMtx);
             generic_block<SSBDemod>::tempStop();
             generic_block<SSBDemod>::unregisterInput(_in);
@@ -281,7 +300,7 @@ namespace dsp {
         }
 
         void setSampleRate(float sampleRate) {
-            // No need to restart
+            assert(generic_block<SSBDemod>::_block_init);
             _sampleRate = sampleRate;
             switch (_mode) {
             case MODE_USB:
@@ -297,7 +316,7 @@ namespace dsp {
         }
 
         void setBandWidth(float bandWidth) {
-            // No need to restart
+            assert(generic_block<SSBDemod>::_block_init);
             _bandWidth = bandWidth;
             switch (_mode) {
             case MODE_USB:
@@ -313,6 +332,7 @@ namespace dsp {
         }
 
         void setMode(int mode) {
+            assert(generic_block<SSBDemod>::_block_init);
             _mode = mode;
             switch (_mode) {
             case MODE_USB:
@@ -354,6 +374,7 @@ namespace dsp {
     class MSKDemod : public generic_hier_block<MSKDemod> {
     public:
         MSKDemod() {}
+
         MSKDemod(stream<complex_t>* input, float sampleRate, float deviation, float baudRate, float omegaGain = (0.01*0.01) / 4, float muGain = 0.01f, float omegaRelLimit = 0.005f) {
             init(input, sampleRate, deviation, baudRate, omegaGain, muGain, omegaRelLimit);
         }
@@ -372,9 +393,11 @@ namespace dsp {
 
             generic_hier_block<MSKDemod>::registerBlock(&demod);
             generic_hier_block<MSKDemod>::registerBlock(&recov);
+            generic_hier_block<MSKDemod>::_block_init = true;
         }
 
         void setSampleRate(float sampleRate) {
+            assert(generic_hier_block<MSKDemod>::_block_init);
             generic_hier_block<MSKDemod>::tempStop();
             _sampleRate = sampleRate;
             demod.setSampleRate(_sampleRate);
@@ -383,23 +406,27 @@ namespace dsp {
         }
 
         void setDeviation(float deviation) {
+            assert(generic_hier_block<MSKDemod>::_block_init);
             _deviation = deviation;
             demod.setDeviation(deviation);
         }
 
         void setBaudRate(float baudRate, float omegaRelLimit) {
+            assert(generic_hier_block<MSKDemod>::_block_init);
             _baudRate = baudRate;
             _omegaRelLimit = omegaRelLimit;
             recov.setOmega(_sampleRate / _baudRate, _omegaRelLimit);
         }
 
         void setMMGains(float omegaGain, float myGain) {
+            assert(generic_hier_block<MSKDemod>::_block_init);
             _omegaGain = omegaGain;
             _muGain = myGain;
             recov.setGains(_omegaGain, _muGain);
         }
 
         void setOmegaRelLimit(float omegaRelLimit) {
+            assert(generic_hier_block<MSKDemod>::_block_init);
             _omegaRelLimit = omegaRelLimit;
             recov.setOmegaRelLimit(_omegaRelLimit);
         }
@@ -422,6 +449,7 @@ namespace dsp {
     class PSKDemod : public generic_hier_block<PSKDemod<ORDER, OFFSET>> {
     public:
         PSKDemod() {}
+
         PSKDemod(stream<complex_t>* input, float sampleRate, float baudRate, int RRCTapCount = 31, float RRCAlpha = 0.32f, float agcRate = 10e-4, float costasLoopBw = 0.004f, float omegaGain = (0.01*0.01) / 4, float muGain = 0.01f, float omegaRelLimit = 0.005f) {
             init(input, sampleRate, baudRate, RRCTapCount, RRCAlpha, agcRate, costasLoopBw, omegaGain, muGain, omegaRelLimit);
         }
@@ -458,13 +486,17 @@ namespace dsp {
             generic_hier_block<PSKDemod<ORDER, OFFSET>>::registerBlock(&recov);
 
             out = &recov.out;
+
+            generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* input) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             agc.setInput(input);
         }
 
         void setSampleRate(float sampleRate) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _sampleRate = sampleRate;
             rrc.tempStop();
             recov.tempStop();
@@ -476,6 +508,7 @@ namespace dsp {
         }
 
         void setBaudRate(float baudRate) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _baudRate = baudRate;
             rrc.tempStop();
             recov.tempStop();
@@ -487,6 +520,7 @@ namespace dsp {
         }
 
         void setRRCParams(int RRCTapCount, float RRCAlpha) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _RRCTapCount = RRCTapCount;
             _RRCAlpha = RRCAlpha;
             taps.setTapCount(_RRCTapCount);
@@ -495,22 +529,26 @@ namespace dsp {
         }
 
         void setAgcRate(float agcRate) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _agcRate = agcRate;
             agc.setRate(_agcRate);
         }
 
         void setCostasLoopBw(float costasLoopBw) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _costasLoopBw = costasLoopBw;
             demod.setLoopBandwidth(_costasLoopBw);
         }
 
         void setMMGains(float omegaGain, float myGain) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _omegaGain = omegaGain;
             _muGain = myGain;
             recov.setGains(_omegaGain, _muGain);
         }
 
         void setOmegaRelLimit(float omegaRelLimit) {
+            assert((generic_hier_block<PSKDemod<ORDER, OFFSET>>::_block_init));
             _omegaRelLimit = omegaRelLimit;
             recov.setOmegaRelLimit(_omegaRelLimit);
         }
@@ -539,6 +577,7 @@ namespace dsp {
     class PMDemod : public generic_hier_block<PMDemod> {
     public:
         PMDemod() {}
+
         PMDemod(stream<complex_t>* input, float sampleRate, float baudRate, float agcRate = 0.02e-3f, float pllLoopBandwidth = (0.06f*0.06f) / 4.0f, int rrcTapCount = 31, float rrcAlpha = 0.6f, float omegaGain = (0.01*0.01) / 4, float muGain = 0.01f, float omegaRelLimit = 0.005f) {
             init(input, sampleRate, baudRate, agcRate, pllLoopBandwidth, rrcTapCount, rrcAlpha, omegaGain, muGain, omegaRelLimit);
         }
@@ -566,23 +605,28 @@ namespace dsp {
             generic_hier_block<PMDemod>::registerBlock(&pll);
             generic_hier_block<PMDemod>::registerBlock(&rrc);
             generic_hier_block<PMDemod>::registerBlock(&recov);
+            generic_hier_block<PMDemod>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* input) {
+            assert(generic_hier_block<PMDemod>::_block_init);
             agc.setInput(input);
         }
 
         void setAgcRate(float agcRate) {
+            assert(generic_hier_block<PMDemod>::_block_init);
             _agcRate = agcRate;
             agc.setRate(_agcRate);
         }
 
         void setPllLoopBandwidth(float pllLoopBandwidth) {
+            assert(generic_hier_block<PMDemod>::_block_init);
             _pllLoopBandwidth = pllLoopBandwidth;
             pll.setLoopBandwidth(_pllLoopBandwidth);
         }
 
         void setRRCParams(int rrcTapCount, float rrcAlpha) {
+            assert(generic_hier_block<PMDemod>::_block_init);
             _rrcTapCount = rrcTapCount;
             _rrcAlpha = rrcAlpha;
             rrcwin.setTapCount(_rrcTapCount);
@@ -591,12 +635,14 @@ namespace dsp {
         }
 
         void setMMGains(float omegaGain, float muGain) {
+            assert(generic_hier_block<PMDemod>::_block_init);
             _omegaGain = omegaGain;
             _muGain = muGain;
             recov.setGains(_omegaGain, _muGain);
         }
 
         void setOmegaRelLimit(float omegaRelLimit) {
+            assert(generic_hier_block<PMDemod>::_block_init);
             _omegaRelLimit = omegaRelLimit;
             recov.setOmegaRelLimit(_omegaRelLimit);
         }
@@ -619,5 +665,65 @@ namespace dsp {
         float _omegaGain;
         float _muGain;
         float _omegaRelLimit;
+    };
+
+    class StereoFMDemod : public generic_hier_block<StereoFMDemod> {
+    public:
+        StereoFMDemod() {}
+
+        StereoFMDemod(stream<complex_t>* input, float sampleRate, float deviation) {
+            init(input, sampleRate, deviation);
+        }
+
+        void init(stream<complex_t>* input, float sampleRate, float deviation) {
+            _sampleRate = sampleRate;
+
+            PilotFirWin.init(18750, 19250, 3000, _sampleRate);
+
+            demod.init(input, _sampleRate, deviation);
+
+            r2c.init(&demod.out);
+
+            pilotFilter.init(&r2c.out, &PilotFirWin);
+
+            demux.init(&pilotFilter.dataOut, &pilotFilter.pilotOut, 0.1f);
+
+            recon.init(&demux.AplusBOut, &demux.AminusBOut);
+
+            out = &recon.out;
+            
+            generic_hier_block<StereoFMDemod>::registerBlock(&demod);
+            generic_hier_block<StereoFMDemod>::registerBlock(&r2c);
+            generic_hier_block<StereoFMDemod>::registerBlock(&pilotFilter);
+            generic_hier_block<StereoFMDemod>::registerBlock(&demux);
+            generic_hier_block<StereoFMDemod>::registerBlock(&recon);
+            generic_hier_block<StereoFMDemod>::_block_init = true;
+        }
+
+        void setInput(stream<float>* input) {
+            assert(generic_hier_block<StereoFMDemod>::_block_init);
+            r2c.setInput(input);
+        }
+
+        void setDeviation(float deviation) {
+            demod.setDeviation(deviation);
+        }
+
+        stream<stereo_t>* out = NULL;
+
+    private:
+        filter_window::BandPassBlackmanWindow PilotFirWin;
+
+        FloatFMDemod demod;
+
+        RealToComplex r2c;
+
+        FMStereoDemuxPilotFilter pilotFilter;
+
+        FMStereoDemux demux;
+
+        FMStereoReconstruct recon;
+
+        float _sampleRate;
     };
 }

@@ -5,6 +5,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 #include <GL/glew.h>
+#include <utils/event.h>
 
 #define WATERFALL_RESOLUTION    1000000
 
@@ -34,6 +35,9 @@ namespace ImGui {
         double snapInterval = 5000;
         int reference = REF_CENTER;
 
+        bool leftClamped;
+        bool rightClamped;
+
         ImVec2 rectMin;
         ImVec2 rectMax;
         ImVec2 lineMin;
@@ -61,6 +65,8 @@ namespace ImGui {
         double minBandwidth;
         double maxBandwidth;
         bool bandwidthLocked;
+
+        ImU32 color = IM_COL32(255, 255, 255, 50);
     };
 
     class WaterFall {
@@ -133,9 +139,41 @@ namespace ImGui {
         bool mouseInFFT = false;
         bool mouseInWaterfall = false;
 
+        float selectedVFOSNR = NAN;
+
+        bool centerFrequencyLocked = false;
+
         std::map<std::string, WaterfallVFO*> vfos;
         std::string selectedVFO = "";
         bool selectedVFOChanged = false;
+
+        struct FFTRedrawArgs {
+            ImVec2 min;
+            ImVec2 max;
+            double lowFreq;
+            double highFreq;
+            double freqToPixelRatio;
+            double pixelToFreqRatio;
+            ImGuiWindow* window;
+        };
+
+        Event<FFTRedrawArgs> onFFTRedraw;
+
+        struct InputHandlerArgs {
+            ImVec2 fftRectMin;
+            ImVec2 fftRectMax;
+            ImVec2 freqScaleRectMin;
+            ImVec2 freqScaleRectMax;
+            ImVec2 waterfallRectMin;
+            ImVec2 waterfallRectMax;
+            double lowFreq;
+            double highFreq;
+            double freqToPixelRatio;
+            double pixelToFreqRatio;
+        };
+
+        bool inputHandled = false;
+        Event<InputHandlerArgs> onInputProcess;
 
         enum {
             REF_LOWER,
@@ -150,7 +188,6 @@ namespace ImGui {
             _BANDPLAN_POS_COUNT
         };
 
-
     private:
         void drawWaterfall();
         void drawFFT();
@@ -161,7 +198,8 @@ namespace ImGui {
         void onResize();
         void updateWaterfallFb();
         void updateWaterfallTexture();
-        void updateAllVFOs();
+        void updateAllVFOs(bool checkRedrawRequired = false);
+        bool calculateVFOSignalInfo(float* fftLine, WaterfallVFO* vfo, float& strength, float& snr);
 
         bool waterfallUpdate = false;
 
@@ -244,5 +282,7 @@ namespace ImGui {
         bool vfoBorderSelect = false;
         WaterfallVFO* relatedVfo = NULL;
         ImVec2 mouseDownPos;
+
+        ImVec2 lastMousePos;
     };
 };

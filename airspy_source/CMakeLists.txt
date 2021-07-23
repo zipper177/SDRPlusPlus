@@ -19,7 +19,7 @@ set_target_properties(airspy_source PROPERTIES PREFIX "")
 
 if (MSVC)
     # Lib path
-    target_link_directories(sdrpp_core PUBLIC "C:/Program Files/PothosSDR/bin/")
+    target_link_directories(airspy_source PUBLIC "C:/Program Files/PothosSDR/bin/")
 
     target_link_libraries(airspy_source PUBLIC airspy)
 else (MSVC)
@@ -30,6 +30,12 @@ else (MSVC)
     target_include_directories(airspy_source PUBLIC ${LIBAIRSPY_INCLUDE_DIRS})
     target_link_directories(airspy_source PUBLIC ${LIBAIRSPY_LIBRARY_DIRS})
     target_link_libraries(airspy_source PUBLIC ${LIBAIRSPY_LIBRARIES})
+
+    # Include it because for some reason pkgconfig doesn't look here?
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        target_include_directories(airspy_source PUBLIC "/usr/local/include")
+    endif()
+
 endif ()
 
 # Install directives

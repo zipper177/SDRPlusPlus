@@ -14,6 +14,7 @@ namespace displaymenu {
     std::vector<std::string> colorMapNames;
     std::string colorMapNamesTxt = "";
     std::string colorMapAuthor = "";
+    int selectedWindow = 0;
 
     const int FFTSizes[] = {
         65536,
@@ -68,8 +69,10 @@ namespace displaymenu {
                 break;
             }
         }
-        setFFTSize(FFTSizes[fftSizeId]);
+        gui::mainWindow.setFFTSize(FFTSizes[fftSizeId]);
 
+        selectedWindow = std::clamp<int>((int)core::configManager.conf["fftWindow"], 0, _FFT_WINDOW_COUNT-1);
+        gui::mainWindow.setFFTWindow(selectedWindow);
     }
 
     void draw(void* ctx) {
@@ -77,21 +80,21 @@ namespace displaymenu {
         if (ImGui::Checkbox("Show Waterfall##_sdrpp", &showWaterfall) || ImGui::IsKeyPressed(GLFW_KEY_HOME, false)) {
             if (ImGui::IsKeyPressed(GLFW_KEY_HOME, false)) { showWaterfall = !showWaterfall; }
             showWaterfall ? gui::waterfall.showWaterfall() : gui::waterfall.hideWaterfall();
-            core::configManager.aquire();
+            core::configManager.acquire();
             core::configManager.conf["showWaterfall"] = showWaterfall;
             core::configManager.release(true);
         }
 
         if (ImGui::Checkbox("Fast FFT##_sdrpp", &fastFFT)) {
             gui::waterfall.setFastFFT(fastFFT);
-            core::configManager.aquire();
+            core::configManager.acquire();
             core::configManager.conf["fastFFT"] = fastFFT;
             core::configManager.release(true);
         }
 
         if (ImGui::Checkbox("Full Waterfall Update##_sdrpp", &fullWaterfallUpdate)) {
             gui::waterfall.setFullWaterfallUpdate(fullWaterfallUpdate);
-            core::configManager.aquire();
+            core::configManager.acquire();
             core::configManager.conf["fullWaterfallUpdate"] = fullWaterfallUpdate;
             core::configManager.release(true);
         }
@@ -99,10 +102,20 @@ namespace displaymenu {
         ImGui::Text("FFT Size");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
-        if (ImGui::Combo("##test_fft_size", &fftSizeId, FFTSizesStr)) {
-            setFFTSize(FFTSizes[fftSizeId]);
-            core::configManager.aquire();
+        if (ImGui::Combo("##sdrpp_fft_size", &fftSizeId, FFTSizesStr)) {
+            gui::mainWindow.setFFTSize(FFTSizes[fftSizeId]);
+            core::configManager.acquire();
             core::configManager.conf["fftSize"] = FFTSizes[fftSizeId];
+            core::configManager.release(true);
+        }
+
+        ImGui::Text("FFT Window");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(menuWidth - ImGui::GetCursorPosX());
+        if (ImGui::Combo("##sdrpp_fft_window", &selectedWindow, "Rectangular\0Blackman\0")) {
+            gui::mainWindow.setFFTWindow(selectedWindow);
+            core::configManager.acquire();
+            core::configManager.conf["fftWindow"] = selectedWindow;
             core::configManager.release(true);
         }
 
@@ -113,7 +126,7 @@ namespace displaymenu {
             if (ImGui::Combo("##_sdrpp_color_map_sel", &colorMapId, colorMapNamesTxt.c_str())) {
                 colormaps::Map map = colormaps::maps[colorMapNames[colorMapId]];
                 gui::waterfall.updatePalletteFromArray(map.map, map.entryCount);
-                core::configManager.aquire();
+                core::configManager.acquire();
                 core::configManager.conf["colorMap"] = colorMapNames[colorMapId];
                 core::configManager.release(true);
                 colorMapAuthor = map.author;

@@ -77,7 +77,7 @@ public:
 
         refresh();
 
-        config.aquire();
+        config.acquire();
         if (!config.conf["device"].is_string()) {
             selectedDevName = "";
             config.conf["device"] = "";
@@ -156,7 +156,7 @@ public:
         std::sort(gainList.begin(), gainList.end());
 
         bool created = false;
-        config.aquire();
+        config.acquire();
         if (!config.conf["devices"].contains(selectedDevName)) {
             created = true;
             config.conf["devices"][selectedDevName]["sampleRate"] = sampleRate;
@@ -296,7 +296,16 @@ private:
     static void tune(double freq, void* ctx) {
         RTLSDRSourceModule* _this = (RTLSDRSourceModule*)ctx;
         if (_this->running) {
-            rtlsdr_set_center_freq(_this->openDev, freq);
+            uint32_t newFreq = freq;
+            int i;
+            for (i = 0; i < 10; i++) {
+                rtlsdr_set_center_freq(_this->openDev, freq);
+                if (rtlsdr_get_center_freq(_this->openDev) == newFreq) { break; }
+            }
+            if (i > 1) {
+                spdlog::warn("RTL-SDR took {0} attempts to tune...", i);
+            }
+            
         }
         _this->freq = freq;
         spdlog::info("RTLSDRSourceModule '{0}': Tune: {1}!", _this->name, freq);
@@ -313,7 +322,7 @@ private:
             _this->selectById(_this->devId);
             core::setInputSampleRate(_this->sampleRate);
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["device"] = _this->selectedDevName;
                 config.release(true);
             }
@@ -323,7 +332,7 @@ private:
             _this->sampleRate = sampleRates[_this->srId];
             core::setInputSampleRate(_this->sampleRate);
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["sampleRate"] = _this->sampleRate;
                 config.release(true);
             }
@@ -360,7 +369,7 @@ private:
                 }
             }
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["directSampling"] = _this->directSamplingMode;
                 config.release(true);
             }
@@ -371,7 +380,7 @@ private:
                 rtlsdr_set_bias_tee(_this->openDev, _this->biasT);
             }
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["biasT"] = _this->biasT;
                 config.release(true);
             }
@@ -382,7 +391,7 @@ private:
                 rtlsdr_set_offset_tuning(_this->openDev, _this->offsetTuning);
             }
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["offsetTuning"] = _this->offsetTuning;
                 config.release(true);
             }
@@ -393,7 +402,7 @@ private:
                 rtlsdr_set_agc_mode(_this->openDev, _this->rtlAgc);
             }
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["rtlAgc"] = _this->rtlAgc;
                 config.release(true);
             }
@@ -410,7 +419,7 @@ private:
                 }
             }
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["tunerAgc"] = _this->tunerAgc;
                 config.release(true);
             }
@@ -424,7 +433,7 @@ private:
                 rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
             }
             if (_this->selectedDevName != "") {
-                config.aquire();
+                config.acquire();
                 config.conf["devices"][_this->selectedDevName]["gain"] = _this->gainId;
                 config.release(true);
             }

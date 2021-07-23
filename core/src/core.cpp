@@ -19,6 +19,8 @@
 #include <duktape/duktape.h>
 #include <duktape/duk_console.h>
 #include <filesystem>
+#include <gui/menus/theme.h>
+#include <server.h>
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize.h>
@@ -51,7 +53,7 @@ namespace core {
         gui::waterfall.setViewOffset(0);
         gui::waterfall.setViewBandwidth(samplerate);
         sigpath::signalPath.setSampleRate(samplerate);
-        setViewBandwidthSlider(samplerate);
+        gui::mainWindow.setViewBandwidthSlider(samplerate);
     }
 };
 
@@ -117,6 +119,7 @@ int sdrpp_main(int argc, char *argv[]) {
     defConfig["fastFFT"] = false;
     defConfig["fftHeight"] = 300;
     defConfig["fftSize"] = 65536;
+    defConfig["fftWindow"] = 1;
     defConfig["frequency"] = 100000000.0;
     defConfig["fullWaterfallUpdate"] = false;
     defConfig["max"] = 0.0;
@@ -137,42 +140,79 @@ int sdrpp_main(int argc, char *argv[]) {
     defConfig["menuElements"][3]["name"] = "Sinks";
     defConfig["menuElements"][3]["open"] = true;
 
-    defConfig["menuElements"][4]["name"] = "Scripting";
-    defConfig["menuElements"][4]["open"] = false;
+    defConfig["menuElements"][3]["name"] = "Frequency Manager";
+    defConfig["menuElements"][3]["open"] = true;
 
-    defConfig["menuElements"][5]["name"] = "Band Plan";
-    defConfig["menuElements"][5]["open"] = true;
+    defConfig["menuElements"][4]["name"] = "VFO Color";
+    defConfig["menuElements"][4]["open"] = true;
 
-    defConfig["menuElements"][6]["name"] = "Display";
+    defConfig["menuElements"][5]["name"] = "Scripting";
+    defConfig["menuElements"][5]["open"] = false;
+
+    defConfig["menuElements"][6]["name"] = "Band Plan";
     defConfig["menuElements"][6]["open"] = true;
+
+    defConfig["menuElements"][7]["name"] = "Display";
+    defConfig["menuElements"][7]["open"] = true;
 
     defConfig["menuWidth"] = 300;
     defConfig["min"] = -120.0;
 
     // Module instances
-    defConfig["moduleInstances"]["Radio"] = "radio";
-    defConfig["moduleInstances"]["Recorder"] = "recorder";
-    defConfig["moduleInstances"]["SoapySDR Source"] = "soapy_source";
-    defConfig["moduleInstances"]["PlutoSDR Source"] = "plutosdr_source";
-    defConfig["moduleInstances"]["HackRF Source"] = "hackrf_source";
-    defConfig["moduleInstances"]["RTL-TCP Source"] = "rtl_tcp_source";
-    defConfig["moduleInstances"]["RTL-SDR Source"] = "rtl_sdr_source";
-    defConfig["moduleInstances"]["AirspyHF+ Source"] = "airspyhf_source";
-    defConfig["moduleInstances"]["Airspy Source"] = "airspy_source";
-    defConfig["moduleInstances"]["File Source"] = "file_source";
-    defConfig["moduleInstances"]["SDRplay Source"] = "sdrplay_source";
+    defConfig["moduleInstances"]["Airspy Source"]["module"] = "airspy_source";
+    defConfig["moduleInstances"]["Airspy Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["AirspyHF+ Source"]["module"] = "airspyhf_source";
+    defConfig["moduleInstances"]["AirspyHF+ Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["BladeRF Source"]["module"] = "bladerf_source";
+    defConfig["moduleInstances"]["BladeRF Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["File Source"]["module"] = "file_source";
+    defConfig["moduleInstances"]["File Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["HackRF Source"]["module"] = "hackrf_source";
+    defConfig["moduleInstances"]["HackRF Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["LimeSDR Source"]["module"] = "limesdr_source";
+    defConfig["moduleInstances"]["LimeSDR Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["RTL-SDR Source"]["module"] = "rtl_sdr_source";
+    defConfig["moduleInstances"]["RTL-SDR Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["RTL-TCP Source"]["module"] = "rtl_tcp_source";
+    defConfig["moduleInstances"]["RTL-TCP Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["SDRplay Source"]["module"] = "sdrplay_source";
+    defConfig["moduleInstances"]["SDRplay Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["SoapySDR Source"]["module"] = "soapy_source";
+    defConfig["moduleInstances"]["SoapySDR Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["SpyServer Source"]["module"] = "spyserver_source";
+    defConfig["moduleInstances"]["SpyServer Source"]["enabled"] = true;
+    defConfig["moduleInstances"]["PlutoSDR Source"]["module"] = "plutosdr_source";
+    defConfig["moduleInstances"]["PlutoSDR Source"]["enabled"] = true;
+
     defConfig["moduleInstances"]["Audio Sink"] = "audio_sink";
 
+    defConfig["moduleInstances"]["Radio"] = "radio";
+
+    defConfig["moduleInstances"]["Frequency Manager"] = "frequency_manager";
+    defConfig["moduleInstances"]["Recorder"] = "recorder";
+    defConfig["moduleInstances"]["Rigctl Server"] = "rigctl_server";
+    
+
+    // Themes
+    defConfig["theme"] = "Dark";
+
     defConfig["modules"] = json::array();
+    defConfig["offsetMode"] = (int)0; // Off
     defConfig["offset"] = 0.0;
     defConfig["showMenu"] = true;
     defConfig["showWaterfall"] = true;
     defConfig["source"] = "";
-    defConfig["streams"] = json::object();
+
+    defConfig["streams"]["Radio"]["muted"] = false;
+    defConfig["streams"]["Radio"]["sink"] = "Audio";
+    defConfig["streams"]["Radio"]["volume"] = 1.0f;
+
     defConfig["windowSize"]["h"] = 720;
     defConfig["windowSize"]["w"] = 1280;
 
     defConfig["vfoOffsets"] = json::object();
+
+    defConfig["vfoColors"]["Radio"] = "#FFFFFF";
 
 #ifdef _WIN32
     defConfig["modulesDirectory"] = "./modules";
@@ -188,12 +228,12 @@ int sdrpp_main(int argc, char *argv[]) {
     core::configManager.load(defConfig);
     core::configManager.enableAutoSave();
 
-    
-    core::configManager.aquire();
+
+    core::configManager.acquire();
     // Fix missing elements in config
     for (auto const& item : defConfig.items()) {
         if (!core::configManager.conf.contains(item.key())) {
-            spdlog::warn("Missing key in config {0}, repairing", item.key());
+            spdlog::info("Missing key in config {0}, repairing", item.key());
             core::configManager.conf[item.key()] = defConfig[item.key()];
         }
     }
@@ -202,12 +242,24 @@ int sdrpp_main(int argc, char *argv[]) {
     auto items = core::configManager.conf.items();
     for (auto const& item : items) {
         if (!defConfig.contains(item.key())) {
-            spdlog::warn("Unused key in config {0}, repairing", item.key());
+            spdlog::info("Unused key in config {0}, repairing", item.key());
             core::configManager.conf.erase(item.key());
         }
     }
 
+    // Update to new module representation in config if needed
+    for (auto [_name, inst] : core::configManager.conf["moduleInstances"].items()) {
+        if (!inst.is_string()) { continue; }
+        std::string mod = inst;
+        json newMod;
+        newMod["module"] = mod;
+        newMod["enabled"] = true;
+        core::configManager.conf["moduleInstances"][_name] = newMod;
+    }
+
     core::configManager.release(true);
+
+    if (options::opts.serverMode) { return server_main(); }
 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -228,8 +280,8 @@ int sdrpp_main(int argc, char *argv[]) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 #endif
-    
-    core::configManager.aquire();
+
+    core::configManager.acquire();
     int winWidth = core::configManager.conf["windowSize"]["w"];
     int winHeight = core::configManager.conf["windowSize"]["h"];
     maximized = core::configManager.conf["maximized"];
@@ -313,7 +365,8 @@ int sdrpp_main(int argc, char *argv[]) {
         }
     }
 
-    if (!style::setDarkStyle(resDir)) { return -1; }
+    if (!style::loadFonts(resDir)) { return -1; }
+    thememenu::init(resDir);
 
     LoadingScreen::setWindow(core::window);
 
@@ -329,7 +382,7 @@ int sdrpp_main(int argc, char *argv[]) {
     spdlog::info("Loading band plans color table");
     bandplan::loadColorTable(bandColors);
 
-    windowInit();
+    gui::mainWindow.init();
 
     spdlog::info("Ready.");
 
@@ -349,7 +402,7 @@ int sdrpp_main(int argc, char *argv[]) {
 
         if (_maximized != maximized) {
             _maximized = maximized;
-            core::configManager.aquire();
+            core::configManager.acquire();
             core::configManager.conf["maximized"]= _maximized;
             if (!maximized) {
                 glfwSetWindowSize(core::window, core::configManager.conf["windowSize"]["w"], core::configManager.conf["windowSize"]["h"]);
@@ -379,7 +432,7 @@ int sdrpp_main(int argc, char *argv[]) {
         if ((_winWidth != winWidth || _winHeight != winHeight) && !maximized && _winWidth > 0 && _winHeight > 0) {
             winWidth = _winWidth;
             winHeight = _winHeight;
-            core::configManager.aquire();
+            core::configManager.acquire();
             core::configManager.conf["windowSize"]["w"] = winWidth;
             core::configManager.conf["windowSize"]["h"] = winHeight;
             core::configManager.release(true);
@@ -388,7 +441,7 @@ int sdrpp_main(int argc, char *argv[]) {
         if (winWidth > 0 && winHeight > 0) {
             ImGui::SetNextWindowPos(ImVec2(0, 0));
             ImGui::SetNextWindowSize(ImVec2(_winWidth, _winHeight));
-            drawWindow();
+            gui::mainWindow.draw();
         }
 
         // Rendering
@@ -396,8 +449,8 @@ int sdrpp_main(int argc, char *argv[]) {
         int display_w, display_h;
         glfwGetFramebufferSize(core::window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(0.0666f, 0.0666f, 0.0666f, 1.0f);
-        //glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
+        //glClearColor(0.0666f, 0.0666f, 0.0666f, 1.0f);
+        glClearColor(gui::themeManager.clearColor.x, gui::themeManager.clearColor.y, gui::themeManager.clearColor.z, gui::themeManager.clearColor.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -412,6 +465,8 @@ int sdrpp_main(int argc, char *argv[]) {
 
     glfwDestroyWindow(core::window);
     glfwTerminate();
+
+    sigpath::signalPath.stop();
 
     return 0;
 }

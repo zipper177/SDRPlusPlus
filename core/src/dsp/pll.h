@@ -10,6 +10,7 @@ namespace dsp {
     class CostasLoop: public generic_block<CostasLoop<ORDER>> {
     public:
         CostasLoop() {}
+
         CostasLoop(stream<complex_t>* in, float loopBandwidth) { init(in, loopBandwidth); }
 
         void init(stream<complex_t>* in, float loopBandwidth) {
@@ -25,9 +26,11 @@ namespace dsp {
 
             generic_block<CostasLoop<ORDER>>::registerInput(_in);
             generic_block<CostasLoop<ORDER>>::registerOutput(&out);
+            generic_block<CostasLoop<ORDER>>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<CostasLoop<ORDER>>::_block_init);
             generic_block<CostasLoop<ORDER>>::tempStop();
             generic_block<CostasLoop<ORDER>>::unregisterInput(_in);
             _in = in;
@@ -36,6 +39,7 @@ namespace dsp {
         }
 
         void setLoopBandwidth(float loopBandwidth) {
+            assert(generic_block<CostasLoop<ORDER>>::_block_init);
             generic_block<CostasLoop<ORDER>>::tempStop();
             _loopBandwidth = loopBandwidth;
             float dampningFactor = sqrtf(2.0f) / 2.0f;
@@ -121,6 +125,7 @@ namespace dsp {
     class CarrierTrackingPLL: public generic_block<CarrierTrackingPLL<T>> {
     public:
         CarrierTrackingPLL() {}
+
         CarrierTrackingPLL(stream<complex_t>* in, float loopBandwidth) { init(in, loopBandwidth); }
 
         void init(stream<complex_t>* in, float loopBandwidth) {
@@ -136,9 +141,11 @@ namespace dsp {
 
             generic_block<CarrierTrackingPLL<T>>::registerInput(_in);
             generic_block<CarrierTrackingPLL<T>>::registerOutput(&out);
+            generic_block<CarrierTrackingPLL<T>>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<CarrierTrackingPLL<T>>::_block_init);
             generic_block<CarrierTrackingPLL<T>>::tempStop();
             generic_block<CarrierTrackingPLL<T>>::unregisterInput(_in);
             _in = in;
@@ -147,6 +154,7 @@ namespace dsp {
         }
 
         void setLoopBandwidth(float loopBandwidth) {
+            assert(generic_block<CarrierTrackingPLL<T>>::_block_init);
             generic_block<CarrierTrackingPLL<T>>::tempStop();
             _loopBandwidth = loopBandwidth;
             float dampningFactor = sqrtf(2.0f) / 2.0f;
@@ -224,6 +232,7 @@ namespace dsp {
     class PLL: public generic_block<PLL> {
     public:
         PLL() {}
+
         PLL(stream<complex_t>* in, float loopBandwidth) { init(in, loopBandwidth); }
 
         void init(stream<complex_t>* in, float loopBandwidth) {
@@ -239,9 +248,11 @@ namespace dsp {
 
             generic_block<PLL>::registerInput(_in);
             generic_block<PLL>::registerOutput(&out);
+            generic_block<PLL>::_block_init = true;
         }
 
         void setInput(stream<complex_t>* in) {
+            assert(generic_block<PLL>::_block_init);
             generic_block<PLL>::tempStop();
             generic_block<PLL>::unregisterInput(_in);
             _in = in;
@@ -250,6 +261,7 @@ namespace dsp {
         }
 
         void setLoopBandwidth(float loopBandwidth) {
+            assert(generic_block<PLL>::_block_init);
             generic_block<PLL>::tempStop();
             _loopBandwidth = loopBandwidth;
             float dampningFactor = sqrtf(2.0f) / 2.0f;
@@ -267,11 +279,6 @@ namespace dsp {
             float error;
 
             for (int i = 0; i < count; i++) {
-
-                // Mix the VFO with the input to create the output value
-                outVal.re = (lastVCO.re*_in->readBuf[i].re) - ((-lastVCO.im)*_in->readBuf[i].im);
-                outVal.im = ((-lastVCO.im)*_in->readBuf[i].re) + (lastVCO.re*_in->readBuf[i].im);
-
                 out.writeBuf[i] = lastVCO;
 
                 // Calculate the phase error estimation
@@ -279,9 +286,6 @@ namespace dsp {
                 error = _in->readBuf[i].phase() - vcoPhase;
                 if (error > 3.1415926535f)        { error -= 2.0f * 3.1415926535f; }
                 else if (error <= -3.1415926535f) { error += 2.0f * 3.1415926535f; }
-                
-                // if (error > 1.0f) { error = 1.0f; }
-                // else if (error < -1.0f) { error = -1.0f; }
                 
                 // Integrate frequency and clamp it
                 vcoFrequency += _beta * error;
@@ -311,7 +315,7 @@ namespace dsp {
 
         float _alpha; // Integral coefficient
         float _beta; // Proportional coefficient
-        float vcoFrequency = 0.0f;
+        float vcoFrequency = ((19000.0f / 250000.0f) * 2.0f * FL_M_PI);
         float vcoPhase = 0.0f;
         complex_t lastVCO;
 

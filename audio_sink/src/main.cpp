@@ -33,7 +33,7 @@ public:
 
         bool created = false;
         std::string device = "";
-        config.aquire();
+        config.acquire();
         if (!config.conf.contains(_streamName)) {
             created = true;
             config.conf[_streamName]["device"] = "";
@@ -95,7 +95,7 @@ public:
     void selectById(int id) {
         devId = id;
         bool created = false;
-        config.aquire();
+        config.acquire();
         if (!config.conf[_streamName]["devices"].contains(devList[id].name)) {
             created = true;
             config.conf[_streamName]["devices"][devList[id].name] = devList[id].preferredSampleRate;
@@ -138,7 +138,7 @@ public:
         ImGui::SetNextItemWidth(menuWidth);
         if (ImGui::Combo(("##_audio_sink_dev_"+_streamName).c_str(), &devId, txtDevList.c_str())) {
             selectById(devId);
-            config.aquire();
+            config.acquire();
             config.conf[_streamName]["device"] = devList[devId].name;
             config.release(true);
         }
@@ -151,7 +151,7 @@ public:
                 doStop();
                 doStart();
             }
-            config.aquire();
+            config.acquire();
             config.conf[_streamName]["devices"][devList[devId].name] = sampleRate;
             config.release(true);
         }
@@ -198,6 +198,15 @@ private:
         AudioSink* _this = (AudioSink*)userData;
         int count = _this->stereoPacker.out.read();
         if (count < 0) { return 0; }
+
+        // For debug purposes only...
+        // if (nBufferFrames != count) { spdlog::warn("Buffer size missmatch, wanted {0}, was asked for {1}", count, nBufferFrames); }
+        // for (int i = 0; i < count; i++) {
+        //     if (_this->stereoPacker.out.readBuf[i].l == NAN || _this->stereoPacker.out.readBuf[i].r == NAN) { spdlog::error("NAN in audio data"); }
+        //     if (_this->stereoPacker.out.readBuf[i].l == INFINITY || _this->stereoPacker.out.readBuf[i].r == INFINITY) { spdlog::error("INFINITY in audio data"); }
+        //     if (_this->stereoPacker.out.readBuf[i].l == -INFINITY || _this->stereoPacker.out.readBuf[i].r == -INFINITY) { spdlog::error("-INFINITY in audio data"); }
+        // }
+
         memcpy(outputBuffer, _this->stereoPacker.out.readBuf, nBufferFrames * sizeof(dsp::stereo_t));
         _this->stereoPacker.out.flush();
         return 0;
@@ -278,11 +287,11 @@ MOD_EXPORT void* _CREATE_INSTANCE_(std::string name) {
     return instance;
 }
 
-MOD_EXPORT void _DELETE_INSTANCE_() {
-    config.disableAutoSave();
-    config.save();
+MOD_EXPORT void _DELETE_INSTANCE_(void* instance) {
+    delete (AudioSinkModule*)instance;
 }
 
 MOD_EXPORT void _END_() {
-    
+    config.disableAutoSave();
+    config.save();
 }

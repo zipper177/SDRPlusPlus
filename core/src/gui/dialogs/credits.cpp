@@ -27,7 +27,7 @@ namespace credits {
         ImGui::Spacing();
         ImGui::Spacing();
 
-        ImGui::Text("This software is brought to you by\n\n");
+        ImGui::Text("This software is brought to you by Alexandre Rouma with the help of\n\n");
 
         ImGui::Columns(3, "CreditColumns", true);
 
@@ -53,7 +53,11 @@ namespace credits {
         ImGui::Spacing();
         ImGui::Spacing();
         ImGui::Spacing();
-        ImGui::Text("SDR++ v" VERSION_STR);
+        ImGui::Text("SDR++ v" VERSION_STR " (Built at " __TIME__ ", " __DATE__ ")");
+
+        ImVec2 dispSize = ImGui::GetIO().DisplaySize;
+        ImVec2 winSize = ImGui::GetWindowSize();
+        ImGui::SetWindowPos(ImVec2(std::round((dispSize.x/2) - (winSize.x/2)), std::round((dispSize.y/2) - (winSize.y/2))));
 
         ImGui::EndPopup();
         ImGui::PopStyleVar(1);

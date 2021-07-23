@@ -12,14 +12,14 @@ else ()
 endif ()
 add_definitions(-DSDRPP_IS_CORE)
 
-# Set the install prefix
-add_compile_definitions(INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}")
-
 # Main code
 file(GLOB_RECURSE SRC "src/*.cpp" "src/*.c")
 
 # Add code to dyn lib
 add_library(sdrpp_core SHARED ${SRC})
+
+# Set the install prefix
+target_compile_definitions(sdrpp_core PUBLIC INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}")
 
 # Include core headers
 target_include_directories(sdrpp_core PUBLIC "src/")
@@ -47,6 +47,9 @@ if (MSVC)
     # FFTW3
     find_package(FFTW3f CONFIG REQUIRED)
     target_link_libraries(sdrpp_core PUBLIC FFTW3::fftw3f)
+
+    # WinSock2
+    target_link_libraries(sdrpp_core PUBLIC wsock32 ws2_32)
 
 else()
     find_package(PkgConfig)

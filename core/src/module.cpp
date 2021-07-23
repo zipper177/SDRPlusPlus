@@ -97,14 +97,23 @@ void ModuleManager::createInstance(std::string name, std::string module) {
     inst.module = modules[module];
     inst.instance = inst.module.createInstance(name);
     instances[name] = inst;
+    onInstanceCreated.emit(name);
 }
 
 void ModuleManager::deleteInstance(std::string name) {
-    spdlog::error("DELETE INSTANCE NOT IMPLEMENTED");
+    if (instances.find(name) == instances.end()) {
+        spdlog::error("Tried to remove non-existant instance '{0}'", name);
+        return;
+    }
+    onInstanceDelete.emit(name);
+    Instance_t inst  = instances[name];
+    inst.module.deleteInstance(inst.instance);
+    instances.erase(name);
+    onInstanceDeleted.emit(name);
 }
 
 void ModuleManager::deleteInstance(ModuleManager::Instance* instance) {
-    spdlog::error("DELETE INSTANCE NOT IMPLEMENTED");
+    spdlog::error("Delete instance not implemented");
 }
 
 void ModuleManager::enableInstance(std::string name) {
@@ -129,6 +138,14 @@ bool ModuleManager::instanceEnabled(std::string name) {
         return false;
     }
     return instances[name].instance->isEnabled();
+}
+
+std::string ModuleManager::getInstanceModuleName(std::string name) {
+    if (instances.find(name) == instances.end()) {
+        spdlog::error("Cannot get module name of'{0}', instance doesn't exist", name);
+        return "";
+    }
+    return std::string(instances[name].module.info->name);
 }
 
 int ModuleManager::countModuleInstances(std::string module) {
